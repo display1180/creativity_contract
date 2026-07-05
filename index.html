@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>창조성 계약서</title>
+    <meta name="description" content="창조성 계약서 - 12주 과정을 위한 나만의 서약">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            background: #f5f0e8;
+            min-height: 100vh;
+            -webkit-text-size-adjust: 100%;
+            overscroll-behavior-y: contain;
+        }
+
+        /* === Contract Wrapper === */
+        .contract-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .contract-image {
+            display: block;
+            width: 100%;
+            height: auto;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            pointer-events: none;
+        }
+
+        /* === Inline Draw Areas (small, on the contract) === */
+        .draw-area {
+            position: absolute;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: background 0.25s ease;
+        }
+
+        .draw-area canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none;
+        }
+
+        /* Subtle guide underline */
+        .draw-area::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(100, 140, 180, 0.22);
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .draw-area.has-content::after {
+            opacity: 0;
+        }
+
+        .draw-area .hint-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 13px;
+            color: rgba(130, 150, 170, 0.5);
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            white-space: nowrap;
+            letter-spacing: 2px;
+        }
+
+        .draw-area.has-content .hint-label {
+            opacity: 0;
+        }
+
+        /* Tap ripple effect */
+        .draw-area:active {
+            background: rgba(70, 130, 180, 0.06);
+        }
+
+        /* ========================================
+           Precise positions (from image analysis)
+           Image: 1004 x 3405 px
+           ======================================== */
+
+        .name-area-1 {
+            top: 11.2%;
+            left: 18%;
+            width: 16%;
+            height: 2.6%;
+        }
+
+        .name-area-2 {
+            top: 28.8%;
+            left: 22%;
+            width: 17%;
+            height: 2.6%;
+        }
+
+        .name-area-3 {
+            top: 48.5%;
+            left: 22%;
+            width: 20%;
+            height: 2.6%;
+        }
+
+        .goal-area {
+            position: absolute;
+            top: 77.5%;
+            left: 14%;
+            width: 70%;
+            height: 3%;
+        }
+
+        .goal-input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 18px;
+            color: #222;
+            resize: none;
+            outline: none;
+            line-height: 1.4;
+            overflow: hidden;
+            padding: 0 4px;
+            text-align: center;
+        }
+
+        .goal-input:focus {
+            background: rgba(70, 130, 180, 0.04);
+            border-radius: 4px;
+        }
+
+        .goal-input::placeholder {
+            color: rgba(130, 150, 170, 0.4);
+            font-size: 15px;
+        }
+
+        .signature-area {
+            top: 85.5%;
+            left: 53%;
+            width: 28%;
+            height: 2.4%;
+        }
+
+        .date-area {
+            position: absolute;
+            top: 88.3%;
+            left: 53%;
+            width: 28%;
+            height: 2.4%;
+            display: flex;
+            align-items: center;
+        }
+
+        .date-input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 16px;
+            color: #222;
+            outline: none;
+            padding: 0 2px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .date-input::-webkit-calendar-picker-indicator {
+            opacity: 0.4;
+            cursor: pointer;
+        }
+
+        /* ========================================
+           Zoom Modal (enlarged drawing surface)
+           ======================================== */
+        .zoom-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 500;
+            background: rgba(0, 0, 0, 0);
+            pointer-events: none;
+            transition: background 0.35s ease;
+        }
+
+        .zoom-backdrop.visible {
+            background: rgba(0, 0, 0, 0.72);
+            pointer-events: all;
+        }
+
+        .zoom-container {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) scale(0.7);
+            z-index: 510;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        opacity 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .zoom-container.visible {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .zoom-label {
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 4px;
+        }
+
+        .zoom-canvas-wrap {
+            background: #faf7f2;
+            border-radius: 12px;
+            padding: 16px 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4),
+                        0 0 0 1px rgba(255,255,255,0.05);
+            position: relative;
+        }
+
+        .zoom-canvas-wrap canvas {
+            display: block;
+            touch-action: none;
+            cursor: crosshair;
+            border-radius: 4px;
+        }
+
+        /* Guide line at bottom of zoom canvas */
+        .zoom-canvas-wrap::after {
+            content: '';
+            position: absolute;
+            bottom: 16px;
+            left: 24px;
+            right: 24px;
+            height: 1.5px;
+            background: rgba(0, 0, 0, 0.08);
+            pointer-events: none;
+            border-radius: 1px;
+        }
+
+        .zoom-tools {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .zoom-tools button {
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 16px;
+            padding: 9px 22px;
+            border: none;
+            border-radius: 22px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .zoom-btn-undo {
+            background: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.85);
+        }
+        .zoom-btn-undo:active {
+            background: rgba(255,255,255,0.3);
+            transform: scale(0.95);
+        }
+
+        .zoom-btn-clear {
+            background: rgba(220, 80, 80, 0.25);
+            color: rgba(255, 160, 160, 0.95);
+        }
+        .zoom-btn-clear:active {
+            background: rgba(220, 80, 80, 0.45);
+            transform: scale(0.95);
+        }
+
+        .zoom-btn-done {
+            background: rgba(70, 180, 130, 0.3);
+            color: rgba(140, 230, 180, 0.95);
+        }
+        .zoom-btn-done:active {
+            background: rgba(70, 180, 130, 0.5);
+            transform: scale(0.95);
+        }
+
+        .zoom-hint {
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 14px;
+            color: rgba(255,255,255,0.35);
+            margin-top: 4px;
+        }
+
+        /* === Export Section === */
+        .export-section {
+            padding: 30px 20px 60px;
+            text-align: center;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .export-btn {
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 22px;
+            padding: 14px 56px;
+            background: #2a2a2a;
+            color: #e8e0d4;
+            border: 1.5px solid rgba(255,255,255,0.12);
+            border-radius: 28px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            letter-spacing: 6px;
+        }
+
+        .export-btn:active {
+            background: #444;
+            transform: scale(0.97);
+        }
+
+        /* === Export overlay === */
+        .export-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .export-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 36px; height: 36px;
+            border: 2.5px solid rgba(255,255,255,0.15);
+            border-top-color: rgba(255,255,255,0.8);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .export-overlay p {
+            font-family: 'Nanum Pen Script', cursive;
+            color: rgba(255,255,255,0.85);
+            font-size: 18px;
+            margin-top: 16px;
+            letter-spacing: 2px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* prevent body scroll when zoom is open */
+        body.zoom-open {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="contract-wrapper" id="contractWrapper">
+        <img src="창조성계약.jpg"
+             class="contract-image"
+             id="contractImage"
+             alt="창조성 계약서">
+
+        <!-- 이름 1 -->
+        <div class="draw-area name-area-1" data-id="name1" data-label="이름">
+            <canvas></canvas>
+            <span class="hint-label">이름</span>
+        </div>
+
+        <!-- 이름 2 -->
+        <div class="draw-area name-area-2" data-id="name2" data-label="이름">
+            <canvas></canvas>
+            <span class="hint-label">이름</span>
+        </div>
+
+        <!-- 이름 3 -->
+        <div class="draw-area name-area-3" data-id="name3" data-label="이름">
+            <canvas></canvas>
+            <span class="hint-label">이름</span>
+        </div>
+
+        <!-- 66일 목표 -->
+        <div class="goal-area">
+            <textarea class="goal-input"
+                      id="goalInput"
+                      placeholder="목표를 입력하세요..."
+                      rows="1"></textarea>
+        </div>
+
+        <!-- 서명 -->
+        <div class="draw-area signature-area" data-id="signature" data-label="서명">
+            <canvas></canvas>
+            <span class="hint-label">서명</span>
+        </div>
+
+        <!-- 날짜 -->
+        <div class="date-area">
+            <input type="date" class="date-input" id="dateInput">
+        </div>
+    </div>
+
+    <!-- 출력 버튼 -->
+    <div class="export-section">
+        <button class="export-btn" onclick="Contract.export()">출 력</button>
+    </div>
+
+    <!-- Zoom modal -->
+    <div class="zoom-backdrop" id="zoomBackdrop"></div>
+    <div class="zoom-container" id="zoomContainer">
+        <span class="zoom-label" id="zoomLabel"></span>
+        <div class="zoom-canvas-wrap">
+            <canvas id="zoomCanvas"></canvas>
+        </div>
+        <div class="zoom-tools">
+            <button class="zoom-btn-undo" onclick="Contract.undo()">↩ 되돌리기</button>
+            <button class="zoom-btn-clear" onclick="Contract.clear()">✕ 지우기</button>
+            <button class="zoom-btn-done" onclick="Contract.closeZoom()">✓ 완료</button>
+        </div>
+        <span class="zoom-hint">바깥을 터치하면 닫힙니다</span>
+    </div>
+
+    <!-- Export overlay -->
+    <div class="export-overlay" id="exportOverlay">
+        <div class="spinner"></div>
+        <p>계약서를 생성하는 중...</p>
+    </div>
+
+    <script>
+    const Contract = (function() {
+        'use strict';
+
+        // =============================================
+        // Config
+        // =============================================
+        const ZOOM_CANVAS_W = 320;  // CSS width of zoomed canvas
+        const ZOOM_ASPECT   = 3.5;  // width / height ratio for zoomed canvas
+        const LINE_FRAC     = 0.06; // stroke width as fraction of canvas height
+
+        // =============================================
+        // Elements
+        // =============================================
+        const drawAreas      = document.querySelectorAll('.draw-area');
+        const zoomBackdrop   = document.getElementById('zoomBackdrop');
+        const zoomContainer  = document.getElementById('zoomContainer');
+        const zoomLabel      = document.getElementById('zoomLabel');
+        const zoomCanvas     = document.getElementById('zoomCanvas');
+        const goalInput      = document.getElementById('goalInput');
+        const contractImage  = document.getElementById('contractImage');
+        const contractWrapper= document.getElementById('contractWrapper');
+
+        // =============================================
+        // State
+        // =============================================
+        // Strokes are stored in NORMALIZED coords (0–1)
+        const strokeHistory = {};     // { areaId: [ [{x,y}, ...], ... ] }
+        const inlineCanvases = {};    // { areaId: { area, canvas } }
+        let activeId = null;          // currently zoomed area id
+        let isDrawing = false;
+        let currentStroke = [];
+        let mouseDown = false;
+        let scrollY = 0;             // saved scroll position when zoom opens
+
+        // =============================================
+        // Init
+        // =============================================
+        function init() {
+            drawAreas.forEach(area => {
+                const id = area.dataset.id;
+                strokeHistory[id] = [];
+                const canvas = area.querySelector('canvas');
+                sizeInlineCanvas(area, canvas);
+                inlineCanvases[id] = { area, canvas };
+
+                // Tap to open zoom
+                area.addEventListener('click', () => openZoom(id));
+            });
+
+            zoomBackdrop.addEventListener('click', closeZoom);
+
+            // Zoom canvas events
+            zoomCanvas.addEventListener('touchstart',  onStart,  { passive: false });
+            zoomCanvas.addEventListener('touchmove',   onMove,   { passive: false });
+            zoomCanvas.addEventListener('touchend',    onEnd,    { passive: false });
+            zoomCanvas.addEventListener('touchcancel', onEnd,    { passive: false });
+            zoomCanvas.addEventListener('mousedown', e => { mouseDown = true; onStart(e); });
+            zoomCanvas.addEventListener('mousemove', e => { if (mouseDown) onMove(e); });
+            zoomCanvas.addEventListener('mouseup',   e => { mouseDown = false; onEnd(e); });
+            zoomCanvas.addEventListener('mouseleave',e => { if (mouseDown) { mouseDown = false; onEnd(e); } });
+
+            adjustGoalFont();
+            window.addEventListener('resize', onResize);
+        }
+
+        // =============================================
+        // Inline canvas (small, on the contract)
+        // =============================================
+        function sizeInlineCanvas(area, canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = area.getBoundingClientRect();
+            canvas.width  = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.height * dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+        }
+
+        function renderInline(id) {
+            const { area, canvas } = inlineCanvases[id];
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.width / dpr;
+            const h = canvas.height / dpr;
+            ctx.clearRect(0, 0, w, h);
+
+            const lw = Math.max(1, h * LINE_FRAC);
+            ctx.lineWidth = lw;
+            ctx.strokeStyle = '#111';
+            ctx.fillStyle = '#111';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            drawStrokes(ctx, strokeHistory[id], w, h, lw);
+        }
+
+        // =============================================
+        // Zoom modal
+        // =============================================
+        function openZoom(id) {
+            activeId = id;
+            const label = inlineCanvases[id].area.dataset.label || id;
+            zoomLabel.textContent = label;
+
+            // Size zoom canvas
+            const vw = window.innerWidth;
+            const cw = Math.min(ZOOM_CANVAS_W, vw - 56);  // padding
+            const ch = Math.round(cw / ZOOM_ASPECT);
+            const dpr = window.devicePixelRatio || 1;
+
+            zoomCanvas.style.width  = cw + 'px';
+            zoomCanvas.style.height = ch + 'px';
+            zoomCanvas.width  = Math.round(cw * dpr);
+            zoomCanvas.height = Math.round(ch * dpr);
+
+            const ctx = zoomCanvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            renderZoom();
+
+            // Lock scroll
+            scrollY = window.scrollY;
+            document.body.classList.add('zoom-open');
+            document.body.style.top = -scrollY + 'px';
+
+            // Show
+            requestAnimationFrame(() => {
+                zoomBackdrop.classList.add('visible');
+                zoomContainer.classList.add('visible');
+            });
+        }
+
+        function closeZoom() {
+            if (!activeId) return;
+
+            // Sync to inline canvas
+            renderInline(activeId);
+            updateHasContent(activeId);
+
+            zoomBackdrop.classList.remove('visible');
+            zoomContainer.classList.remove('visible');
+
+            // Restore scroll
+            document.body.classList.remove('zoom-open');
+            document.body.style.top = '';
+            window.scrollTo(0, scrollY);
+
+            activeId = null;
+            isDrawing = false;
+            currentStroke = [];
+        }
+
+        function renderZoom() {
+            if (!activeId) return;
+            const ctx = zoomCanvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const w = zoomCanvas.width / dpr;
+            const h = zoomCanvas.height / dpr;
+            ctx.clearRect(0, 0, w, h);
+
+            const lw = Math.max(2, h * LINE_FRAC);
+            ctx.lineWidth = lw;
+            ctx.strokeStyle = '#111';
+            ctx.fillStyle = '#111';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            drawStrokes(ctx, strokeHistory[activeId], w, h, lw);
+        }
+
+        function updateHasContent(id) {
+            const { area } = inlineCanvases[id];
+            if (strokeHistory[id].length > 0) {
+                area.classList.add('has-content');
+            } else {
+                area.classList.remove('has-content');
+            }
+        }
+
+        // =============================================
+        // Shared stroke renderer (normalized → pixel)
+        // =============================================
+        function drawStrokes(ctx, strokes, w, h, lw) {
+            strokes.forEach(stroke => {
+                if (!stroke.length) return;
+                if (stroke.length === 1) {
+                    ctx.beginPath();
+                    ctx.arc(stroke[0].x * w, stroke[0].y * h, lw / 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    return;
+                }
+                ctx.beginPath();
+                ctx.moveTo(stroke[0].x * w, stroke[0].y * h);
+                for (let i = 1; i < stroke.length; i++) {
+                    if (i >= 2) {
+                        const cp = stroke[i - 1];
+                        const pt = stroke[i];
+                        const ex = (cp.x + pt.x) / 2 * w;
+                        const ey = (cp.y + pt.y) / 2 * h;
+                        ctx.quadraticCurveTo(cp.x * w, cp.y * h, ex, ey);
+                    } else {
+                        ctx.lineTo(stroke[i].x * w, stroke[i].y * h);
+                    }
+                }
+                ctx.stroke();
+            });
+        }
+
+        // =============================================
+        // Drawing on zoom canvas
+        // =============================================
+        function getNormPos(e) {
+            const rect = zoomCanvas.getBoundingClientRect();
+            const t = e.touches ? e.touches[0] : e;
+            return {
+                x: Math.max(0, Math.min(1, (t.clientX - rect.left) / rect.width)),
+                y: Math.max(0, Math.min(1, (t.clientY - rect.top)  / rect.height))
+            };
+        }
+
+        function onStart(e) {
+            e.preventDefault();
+            if (!activeId) return;
+            isDrawing = true;
+
+            const pos = getNormPos(e);
+            currentStroke = [pos];
+
+            const ctx = zoomCanvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const w = zoomCanvas.width / dpr;
+            const h = zoomCanvas.height / dpr;
+            const lw = Math.max(2, h * LINE_FRAC);
+
+            ctx.lineWidth = lw;
+            ctx.strokeStyle = '#111';
+            ctx.fillStyle = '#111';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            ctx.arc(pos.x * w, pos.y * h, lw / 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(pos.x * w, pos.y * h);
+        }
+
+        function onMove(e) {
+            e.preventDefault();
+            if (!isDrawing || !activeId) return;
+
+            const pos = getNormPos(e);
+            currentStroke.push(pos);
+
+            const ctx = zoomCanvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const w = zoomCanvas.width / dpr;
+            const h = zoomCanvas.height / dpr;
+            const lw = Math.max(2, h * LINE_FRAC);
+            ctx.lineWidth = lw;
+
+            if (currentStroke.length >= 3) {
+                const last = currentStroke.length - 1;
+                const cp = currentStroke[last - 1];
+                const pt = currentStroke[last];
+                const ex = (cp.x + pt.x) / 2 * w;
+                const ey = (cp.y + pt.y) / 2 * h;
+                ctx.quadraticCurveTo(cp.x * w, cp.y * h, ex, ey);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(ex, ey);
+            } else {
+                ctx.lineTo(pos.x * w, pos.y * h);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(pos.x * w, pos.y * h);
+            }
+        }
+
+        function onEnd(e) {
+            if (!isDrawing || !activeId) return;
+            isDrawing = false;
+            if (currentStroke.length > 0) {
+                strokeHistory[activeId].push([...currentStroke]);
+                currentStroke = [];
+            }
+        }
+
+        // =============================================
+        // Undo / Clear
+        // =============================================
+        function undo() {
+            if (!activeId || !strokeHistory[activeId].length) return;
+            strokeHistory[activeId].pop();
+            renderZoom();
+        }
+
+        function clear() {
+            if (!activeId) return;
+            strokeHistory[activeId] = [];
+            renderZoom();
+        }
+
+        // =============================================
+        // Resize
+        // =============================================
+        let resizeTimer;
+        function onResize() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                drawAreas.forEach(area => {
+                    const id = area.dataset.id;
+                    const { canvas } = inlineCanvases[id];
+                    sizeInlineCanvas(area, canvas);
+                    renderInline(id);
+                });
+                adjustGoalFont();
+            }, 150);
+        }
+
+        // =============================================
+        // Goal text
+        // =============================================
+        function adjustGoalFont() {
+            const w = contractWrapper.getBoundingClientRect().width;
+            goalInput.style.fontSize = Math.max(32, Math.min(55, w * 0.10)) + 'px';
+        }
+
+        goalInput.addEventListener('input', () => {
+            goalInput.style.height = 'auto';
+            goalInput.style.height = goalInput.scrollHeight + 'px';
+        });
+
+        // =============================================
+        // Export to JPG
+        // =============================================
+        async function exportContract() {
+            const overlay = document.getElementById('exportOverlay');
+            overlay.classList.add('visible');
+            if (activeId) closeZoom();
+
+            await new Promise(r => setTimeout(r, 150));
+
+            try {
+                const img = contractImage;
+                const natW = img.naturalWidth;
+                const natH = img.naturalHeight;
+                const imgRect = img.getBoundingClientRect();
+
+                const expCanvas = document.createElement('canvas');
+                expCanvas.width = natW;
+                expCanvas.height = natH;
+                const ectx = expCanvas.getContext('2d');
+                ectx.drawImage(img, 0, 0, natW, natH);
+
+                // Draw each area's strokes directly onto export canvas
+                drawAreas.forEach(area => {
+                    const id = area.dataset.id;
+                    const aRect = area.getBoundingClientRect();
+
+                    const rx = (aRect.left - imgRect.left) / imgRect.width;
+                    const ry = (aRect.top  - imgRect.top)  / imgRect.height;
+                    const rw = aRect.width  / imgRect.width;
+                    const rh = aRect.height / imgRect.height;
+
+                    const dx = rx * natW;
+                    const dy = ry * natH;
+                    const dw = rw * natW;
+                    const dh = rh * natH;
+
+                    // Draw strokes directly in export canvas coordinates
+                    const lw = Math.max(2, dh * LINE_FRAC);
+                    ectx.save();
+                    ectx.translate(dx, dy);
+                    ectx.lineWidth = lw;
+                    ectx.strokeStyle = '#111';
+                    ectx.fillStyle = '#111';
+                    ectx.lineCap = 'round';
+                    ectx.lineJoin = 'round';
+                    drawStrokes(ectx, strokeHistory[id], dw, dh, lw);
+                    ectx.restore();
+                });
+
+                // Draw goal text
+                const goalText = goalInput.value.trim();
+                if (goalText) {
+                    const goalArea = document.querySelector('.goal-area');
+                    const gRect = goalArea.getBoundingClientRect();
+                    const rx = (gRect.left - imgRect.left) / imgRect.width;
+                    const ry = (gRect.top  - imgRect.top)  / imgRect.height;
+                    const rw = gRect.width  / imgRect.width;
+                    const rh = gRect.height / imgRect.height;
+
+                    const scale = natW / imgRect.width;
+                    const fontSize = parseFloat(getComputedStyle(goalInput).fontSize) * scale;
+
+                    ectx.font = `${fontSize}px 'Nanum Pen Script', cursive`;
+                    ectx.fillStyle = '#222';
+                    ectx.textAlign = 'center';
+                    ectx.textBaseline = 'middle';
+
+                    const textX = (rx + rw / 2) * natW;
+                    const textY = (ry + rh / 2) * natH;
+
+                    const lines = goalText.split('\n');
+                    const lineH = fontSize * 1.4;
+                    const startY = textY - (lines.length - 1) * lineH / 2;
+                    lines.forEach((line, i) => {
+                        ectx.fillText(line, textX, startY + i * lineH);
+                    });
+                }
+
+                // Draw date text
+                const dateVal = document.getElementById('dateInput').value;
+                if (dateVal) {
+                    const dateArea = document.querySelector('.date-area');
+                    const dRect = dateArea.getBoundingClientRect();
+                    const drx = (dRect.left - imgRect.left) / imgRect.width;
+                    const dry = (dRect.top  - imgRect.top)  / imgRect.height;
+                    const drw = dRect.width  / imgRect.width;
+                    const drh = dRect.height / imgRect.height;
+
+                    const dScale = natW / imgRect.width;
+                    const dFontSize = 16 * dScale;
+                    ectx.font = `${dFontSize}px 'Nanum Pen Script', cursive`;
+                    ectx.fillStyle = '#222';
+                    ectx.textAlign = 'center';
+                    ectx.textBaseline = 'middle';
+
+                    const dateX = (drx + drw / 2) * natW;
+                    const dateY = (dry + drh / 2) * natH;
+                    // Format date nicely
+                    const [y, m, d] = dateVal.split('-');
+                    ectx.fillText(`${y}.${m}.${d}`, dateX, dateY);
+                }
+
+                // Download
+                expCanvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = '창조성_계약서.jpg';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    overlay.classList.remove('visible');
+                }, 'image/jpeg', 0.95);
+
+            } catch (err) {
+                console.error('Export error:', err);
+                alert('내보내기 실패. 다시 시도해 주세요.');
+                document.getElementById('exportOverlay').classList.remove('visible');
+            }
+        }
+
+        // =============================================
+        // Boot
+        // =============================================
+        if (contractImage.complete && contractImage.naturalWidth > 0) {
+            init();
+        } else {
+            contractImage.addEventListener('load', init);
+        }
+
+        // Public API
+        return { closeZoom: closeZoom, undo, clear, export: exportContract };
+    })();
+    </script>
+</body>
+</html>
