@@ -101,6 +101,12 @@
            Image: 1004 x 3405 px
            ======================================== */
 
+        .name-area {
+            position: absolute;
+            display: flex;
+            align-items: flex-end;
+        }
+
         .name-area-1 {
             top: 11.2%;
             left: 18%;
@@ -120,6 +126,24 @@
             left: 22%;
             width: 20%;
             height: 2.6%;
+        }
+
+        .name-input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 18px;
+            color: #222;
+            outline: none;
+            padding: 0 2px;
+            text-align: center;
+        }
+
+        .name-input::placeholder {
+            color: rgba(130, 150, 170, 0.4);
+            font-size: 14px;
         }
 
         .goal-area {
@@ -398,21 +422,18 @@
              alt="창조성 계약서">
 
         <!-- 이름 1 -->
-        <div class="draw-area name-area-1" data-id="name1" data-label="이름">
-            <canvas></canvas>
-            <span class="hint-label">이름</span>
+        <div class="name-area name-area-1">
+            <input type="text" class="name-input" id="nameInput1" placeholder="이름">
         </div>
 
         <!-- 이름 2 -->
-        <div class="draw-area name-area-2" data-id="name2" data-label="이름">
-            <canvas></canvas>
-            <span class="hint-label">이름</span>
+        <div class="name-area name-area-2">
+            <input type="text" class="name-input" id="nameInput2" placeholder="이름">
         </div>
 
         <!-- 이름 3 -->
-        <div class="draw-area name-area-3" data-id="name3" data-label="이름">
-            <canvas></canvas>
-            <span class="hint-label">이름</span>
+        <div class="name-area name-area-3">
+            <input type="text" class="name-input" id="nameInput3" placeholder="이름">
         </div>
 
         <!-- 66일 목표 -->
@@ -815,6 +836,31 @@
                 expCanvas.height = natH;
                 const ectx = expCanvas.getContext('2d');
                 ectx.drawImage(img, 0, 0, natW, natH);
+
+                // Draw name texts
+                const nameInputs = [
+                    { el: document.getElementById('nameInput1'), areaEl: document.querySelector('.name-area-1') },
+                    { el: document.getElementById('nameInput2'), areaEl: document.querySelector('.name-area-2') },
+                    { el: document.getElementById('nameInput3'), areaEl: document.querySelector('.name-area-3') },
+                ];
+                nameInputs.forEach(({ el, areaEl }) => {
+                    const val = el.value.trim();
+                    if (!val) return;
+                    const nRect = areaEl.getBoundingClientRect();
+                    const nrx = (nRect.left - imgRect.left) / imgRect.width;
+                    const nry = (nRect.top  - imgRect.top)  / imgRect.height;
+                    const nrw = nRect.width  / imgRect.width;
+                    const nrh = nRect.height / imgRect.height;
+                    const nScale = natW / imgRect.width;
+                    const nFontSize = parseFloat(getComputedStyle(el).fontSize) * nScale;
+                    ectx.font = `${nFontSize}px 'Nanum Pen Script', cursive`;
+                    ectx.fillStyle = '#222';
+                    ectx.textAlign = 'center';
+                    ectx.textBaseline = 'middle';
+                    const nx = (nrx + nrw / 2) * natW;
+                    const ny = (nry + nrh / 2) * natH;
+                    ectx.fillText(val, nx, ny);
+                });
 
                 // Draw each area's strokes directly onto export canvas
                 drawAreas.forEach(area => {
